@@ -76,7 +76,7 @@ module.exports = {
 				width: 2,
 				min: 50,
 				max: 2000,
-				default: 200,
+				default: 100,
 			},
 			{
 				type: 'checkbox',

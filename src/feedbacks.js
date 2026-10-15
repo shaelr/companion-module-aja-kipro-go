@@ -523,10 +523,13 @@ module.exports = {
 				const bottom = sy(layout.y + layout.height)
 				const barH = bottom - top
 
+				// Round the width once so both bars are always the same number of pixels wide
+				const barW = Math.max(1, sx(layout.width))
+
 				const levels = [self.state['AudioLevelL'], self.state['AudioLevelR']]
 				levels.forEach((level, n) => {
 					const x0 = sx(layout.bars[n])
-					const x1 = sx(layout.bars[n] + layout.width)
+					const x1 = Math.min(w, x0 + barW)
 					for (let y = top; y < bottom; y++) {
 						// dB at this row: 0 at the top, METER_MIN_DB at the bottom
 						const db = METER_MIN_DB * ((y - top + 0.5) / barH)

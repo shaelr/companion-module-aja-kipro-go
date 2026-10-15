@@ -23,7 +23,7 @@ module.exports = {
 
 		if (!this.config.audioMeters) return
 
-		const rate = Math.max(50, Number(this.config.audioMeterRate) || 200)
+		const rate = Math.max(50, Number(this.config.audioMeterRate) || 100)
 		this.meterTimer = setInterval(() => this.doGetMeters(), rate)
 	},
 
