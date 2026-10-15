@@ -95,7 +95,7 @@ export default {
 			method: options.method ?? 'GET',
 			body: options.body,
 			headers,
-			signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+			signal: AbortSignal.timeout(options.timeoutMs ?? HTTP_TIMEOUT_MS),
 		})
 		const data = Buffer.from(await res.arrayBuffer())
 

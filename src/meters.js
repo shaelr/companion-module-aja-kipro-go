@@ -1,4 +1,3 @@
-import http from 'node:http'
 import zlib from 'node:zlib'
 
 // The Ki Pro GO has no audio level params in its REST API. The web UI instead shows
@@ -19,6 +18,7 @@ const METER_BOTTOM_Y = 134
 const METER_PX_PER_DB = 1.5
 const METER_FLOOR_DB = -70
 const METER_LIT_THRESHOLD = 0x70
+const METER_REQUEST_TIMEOUT_MS = 2000
 
 export default {
 	startMeterTimer() {
@@ -39,42 +39,26 @@ export default {
 		this.metersPublished = false
 	},
 
-	doGetMeters() {
+	async doGetMeters() {
 		if (this.meterWaiting || !this.config.host) return
 		this.meterWaiting = true
 
-		const headers = {}
-		if (this.authenticated && this.authToken) {
-			headers['Cookie'] = this.authToken
-		}
-
-		const req = http.get(
-			{
-				host: this.config.host,
-				path: '/images/fp-overlay.png?t=' + Date.now(),
-				headers: headers,
-				timeout: 2000,
-			},
-			(res) => {
-				const chunks = []
-				res.on('data', (c) => chunks.push(c))
-				res.on('end', () => {
-					this.meterWaiting = false
-					if (res.statusCode !== 200) return
-					try {
-						this.processMeters(this.decodePng(Buffer.concat(chunks)))
-					} catch (e) {
-						if (this.config.verbose) {
-							this.log('debug', 'Audio meter decode failed: ' + e)
-						}
-					}
-				})
-			},
-		)
-		req.on('timeout', () => req.destroy())
-		req.on('error', () => {
+		// The timeout covers the whole download, and meterWaiting is always cleared, so a request
+		// that stalls part way through can't stop the meters from polling
+		try {
+			const { data, response } = await this.httpRequest('/images/fp-overlay.png?t=' + Date.now(), {
+				timeoutMs: METER_REQUEST_TIMEOUT_MS,
+			})
+			if (response.statusCode === 200) {
+				this.processMeters(this.decodePng(data))
+			}
+		} catch (e) {
+			if (this.config.verbose) {
+				this.log('debug', 'Audio meter request failed: ' + e)
+			}
+		} finally {
 			this.meterWaiting = false
-		})
+		}
 	},
 
 	// Minimal decoder for 8-bit RGB/RGBA non-interlaced PNGs
