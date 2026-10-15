@@ -10,6 +10,9 @@ import zlib from 'node:zlib'
 //   left bar column x=277-282, right bar column x=298-303
 //   0 dB at y=28, 1.5 px per dB, -70 dB at y=133
 //   unlit segments are dim (no colour channel above 0x50), lit segments are brighter
+//   each bar has a 1-2 px peak-hold marker floating above it, separated by unlit pixels,
+//   which falls slowly and can sit just 1 px above the bar. The level is the top of the
+//   bar: the unbroken lit run read upwards from the bottom
 const METER_COLUMNS = { L: 280, R: 301 }
 const METER_TOP_Y = 28
 const METER_BOTTOM_Y = 134
@@ -130,18 +133,19 @@ export default {
 		return { width, height, bpp, pixels }
 	},
 
-	// Returns the meter level in dB, or null when nothing is lit
+	isMeterPixelLit(img, x, y) {
+		const i = (y * img.width + x) * img.bpp
+		return Math.max(img.pixels[i], img.pixels[i + 1], img.pixels[i + 2]) >= METER_LIT_THRESHOLD
+	},
+
+	// Returns the meter bar level in dB (ignoring the peak-hold marker), or null when the bar is not lit
 	readMeterLevel(img, x) {
-		for (let y = METER_TOP_Y; y <= METER_BOTTOM_Y; y++) {
-			const i = (y * img.width + x) * img.bpp
-			const r = img.pixels[i]
-			const g = img.pixels[i + 1]
-			const b = img.pixels[i + 2]
-			if (Math.max(r, g, b) >= METER_LIT_THRESHOLD) {
-				return Math.max(METER_FLOOR_DB, -(y - METER_TOP_Y) / METER_PX_PER_DB)
-			}
-		}
-		return null
+		if (!this.isMeterPixelLit(img, x, METER_BOTTOM_Y)) return null
+
+		let top = METER_BOTTOM_Y
+		while (top > METER_TOP_Y && this.isMeterPixelLit(img, x, top - 1)) top--
+
+		return Math.max(METER_FLOOR_DB, -(top - METER_TOP_Y) / METER_PX_PER_DB)
 	},
 
 	processMeters(img) {

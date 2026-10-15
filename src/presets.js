@@ -668,16 +668,18 @@ export default {
 			width: 20,
 			height: 70,
 			orientation: 'vertical',
-			min: -60,
+			// Same scale and colour zones as the Ki Pro's own meters: -70 to 0 dB,
+			// green below -20, yellow from -20, red above -2
+			min: -70,
 			max: 0,
 			value: { isExpression: true, value: `$(local:${levelVariable})` },
 			multiColour: true,
 			trackStyle: 'dimmed',
 			roundedEnds: false,
 			stops: [
-				{ value: -60, color: 0x00c800, gradient: false },
+				{ value: -70, color: 0x00c800, gradient: false },
 				{ value: -20, color: 0xe6c800, gradient: false },
-				{ value: -10, color: 0xdc0000, gradient: false },
+				{ value: -2, color: 0xdc0000, gradient: false },
 			],
 		})
 
