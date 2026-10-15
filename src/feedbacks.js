@@ -477,14 +477,14 @@ module.exports = {
 			},
 		}
 
-		// Bar layouts in a 0-100 button coordinate space. 'centered' matches the ATEM module's
-		// layered audio meter preset (two 20-wide bars at x 27/53, y 6-76, label underneath)
+		// Bar layouts in a 0-100 button coordinate space. 'centered' is two 20-wide bars at
+		// x 27/53, y 6-76, leaving room for the label underneath
 		const METER_LAYOUTS = {
 			centered: { bars: [27, 53], width: 20, y: 6, height: 70 },
 			right: { bars: [76, 88], width: 9, y: 6, height: 88 },
 			left: { bars: [3, 15], width: 9, y: 6, height: 88 },
 		}
-		// Same scale and zone colours as the ATEM meters: green to -20, amber to -10, red above
+		// Meter scale and zone colours: green to -20, amber to -10, red above
 		const METER_MIN_DB = -60
 		const METER_ZONES = [
 			{ from: -10, colour: [0xdc, 0x00, 0x00] },
@@ -505,7 +505,7 @@ module.exports = {
 					id: 'position',
 					default: 'centered',
 					choices: [
-						{ id: 'centered', label: 'Centered (ATEM style)' },
+						{ id: 'centered', label: 'Centered' },
 						{ id: 'right', label: 'Right edge' },
 						{ id: 'left', label: 'Left edge' },
 					],
