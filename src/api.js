@@ -1,8 +1,9 @@
-const { InstanceStatus } = require('@companion-module/base')
+import { InstanceStatus } from '@companion-module/base'
 
-const Client = require('node-rest-client').Client
+// Long-polls (wait_for_config_events) return within a few seconds; this only guards against a hung request
+const HTTP_TIMEOUT_MS = 30000
 
-module.exports = {
+export default {
 	startConnectTimer() {
 		let timeout = 5000
 
@@ -71,41 +72,50 @@ module.exports = {
 		if (!this.waiting) {
 			this.waiting = true
 
-			let data = 'password_provided=' + this.config.password
-
-			var args = {
-				data: data,
+			this.request('/authenticator/login', {
+				method: 'POST',
+				body: 'password_provided=' + this.config.password,
 				headers: {
 					'Content-Type': 'application/x-www-form-urlencoded',
 					'User-Agent': 'curl/7.64.1',
 					Accept: '*/*',
 				},
-			}
-
-			let client = new Client()
-
-			client
-				.post(
-					'http://' + this.config.host + '/authenticator/login',
-					args,
-					function (data, response) {
-						this.handleReply(null, { data: data, response: response })
-					}.bind(this)
-				)
-				.on(
-					'error',
-					function (error) {
-						this.handleReply(true, { error: error })
-					}.bind(this)
-				)
+			})
 		}
+	},
+
+	// Fetch a path on the Ki Pro. Resolves to { data: Buffer, response: { statusCode, headers } }
+	async httpRequest(path, options = {}) {
+		const headers = { ...options.headers }
+		if (this.authenticated && this.authToken) {
+			headers['Cookie'] = this.authToken
+		}
+
+		const res = await fetch('http://' + this.config.host + path, {
+			method: options.method ?? 'GET',
+			body: options.body,
+			headers,
+			signal: AbortSignal.timeout(HTTP_TIMEOUT_MS),
+		})
+		const data = Buffer.from(await res.arrayBuffer())
+
+		return { data, response: { statusCode: res.status, headers: { 'set-cookie': res.headers.getSetCookie() } } }
+	},
+
+	// Fetch a path and pass the result to handleReply
+	request(path, options) {
+		this.httpRequest(path, options).then(
+			(result) => this.handleReply(null, result),
+			(error) => this.handleReply(true, { error }),
+		)
 	},
 
 	handleReply(err, data) {
 		let objJson = {}
 
 		if (err) {
-			if (data['error']['code'] == 'HPE_UNEXPECTED_CONTENT_LENGTH') {
+			const errorCode = data.error?.code ?? data.error?.cause?.code
+			if (errorCode == 'HPE_UNEXPECTED_CONTENT_LENGTH') {
 				this.log('warn', 'Non-compliant header recieved. Polling disabled. See help file for details')
 				this.updateStatus(InstanceStatus.Ok, 'No Polling')
 				this.config.polling = false
@@ -118,8 +128,8 @@ module.exports = {
 				this.waiting = false
 				return
 			} else {
-				this.log('error', 'Error connecting to KiPro')
-				this.updateStatus(InstanceStatus.ConnectionFailure, err)
+				this.log('error', 'Error connecting to KiPro: ' + (data.error?.cause?.message ?? data.error?.message ?? data.error))
+				this.updateStatus(InstanceStatus.ConnectionFailure, 'Error connecting to KiPro')
 				this.authenticated = false
 				this.authToken = ''
 				this.connectionID = 0
@@ -157,7 +167,7 @@ module.exports = {
 					}
 				} else {
 					this.log('error', 'Status ' + data.response.statusCode)
-					this.updateStatus(InstanceStatus.ConnectionFailure, err)
+					this.updateStatus(InstanceStatus.ConnectionFailure, 'HTTP status ' + data.response.statusCode)
 					this.authenticated = false
 					this.authToken = ''
 					this.connectionID = 0
@@ -210,7 +220,7 @@ module.exports = {
 		}
 
 		this.checkVariables()
-		this.checkFeedbacks()
+		this.checkAllFeedbacks()
 
 		return 1
 	},
@@ -257,7 +267,7 @@ module.exports = {
 		}
 
 		this.checkVariables()
-		this.checkFeedbacks()
+		this.checkAllFeedbacks()
 
 		return 1
 	},
@@ -271,7 +281,7 @@ module.exports = {
 		this.state['TC_frames'] = timecode[3]
 
 		this.checkVariables()
-		this.checkFeedbacks()
+		this.checkAllFeedbacks()
 
 		return 1
 	},
@@ -370,7 +380,7 @@ module.exports = {
 					}
 				}
 				this.checkVariables()
-				this.checkFeedbacks()
+				this.checkAllFeedbacks()
 				// fetch static params once on connect
 				this.doGetParam('eParamID_SWVersion', (obj) => {
 					if (obj && obj.value != null) {
@@ -424,7 +434,7 @@ module.exports = {
 					if (obj && obj.value != null) {
 						this.state['UIMonitorChannel'] = String(obj.value)
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 					}
 				})
 				this.doGetParam('eParamID_VideoEncoder', (obj) => {
@@ -443,7 +453,7 @@ module.exports = {
 					if (obj && obj.value != null) {
 						this.state['PlaybackSource'] = String(obj.value)
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 					}
 				})
 				for (let _slot = 1; _slot <= 5; _slot++) {
@@ -452,7 +462,7 @@ module.exports = {
 							if (obj && obj.value != null) {
 								this.state[`MediaSlot${_s}State`] = String(obj.value)
 								this.checkVariables()
-								this.checkFeedbacks()
+								this.checkAllFeedbacks()
 							}
 						})
 						this.doGetParam(`eParamID_Media_Slot_${_s}_Remaining_Percent`, (obj) => {
@@ -476,7 +486,7 @@ module.exports = {
 							if (obj && obj.value != null) {
 								this.state[`Ch${_c}Enable`] = String(obj.value)
 								this.checkVariables()
-								this.checkFeedbacks()
+								this.checkAllFeedbacks()
 							}
 						})
 						this.doGetParam(`eParamID_Channel_${_c}_InputFormat`, (obj) => {
@@ -489,14 +499,14 @@ module.exports = {
 							if (obj && obj.value != null) {
 								this.state[`Ch${_c}RecordDest`] = String(obj.value)
 								this.checkVariables()
-								this.checkFeedbacks()
+								this.checkAllFeedbacks()
 							}
 						})
 						this.doGetParam(`eParamID_Channel_${_c}_Backup_Record_Destination`, (obj) => {
 							if (obj && obj.value != null) {
 								this.state[`Ch${_c}BackupDest`] = String(obj.value)
 								this.checkVariables()
-								this.checkFeedbacks()
+								this.checkAllFeedbacks()
 							}
 						})
 					})(_ch)
@@ -520,7 +530,7 @@ module.exports = {
 		for (let clip of clips) {
 			this.availableClips.push({ id: clip['clipname'], label: clip['clipname'] })
 		}
-		this.actions()
+		this.initActions()
 		return 1
 	},
 
@@ -538,7 +548,7 @@ module.exports = {
 				if ((_sm = item['param_id'].match(/^eParamID_Media_Slot_(\d)_State$/))) {
 					this.state[`MediaSlot${_sm[1]}State`] = String(item['int_value'] ?? '')
 					this.checkVariables()
-					this.checkFeedbacks()
+					this.checkAllFeedbacks()
 				} else if ((_sm = item['param_id'].match(/^eParamID_Media_Slot_(\d)_Remaining_Percent$/))) {
 					this.state[`MediaSlot${_sm[1]}Percent`] = String(item['int_value'] ?? '')
 					this.checkVariables()
@@ -560,7 +570,7 @@ module.exports = {
 					case 'eParamID_MediaState':
 						this.state['MediaState'] = item['str_value']
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_CurrentClip':
 						this.state['CurrentClip'] = item['str_value']
@@ -577,17 +587,17 @@ module.exports = {
 					case 'eParamID_HDMIMonitorChannel':
 						this.state['HDMIMonitorChannel'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_SDIMonitorChannel':
 						this.state['SDIMonitorChannel'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_HeadphoneMonitorChannel':
 						this.state['HeadphoneMonitorChannel'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_VideoInput_1':
 					case 'eParamID_VideoInput_2':
@@ -595,7 +605,7 @@ module.exports = {
 					case 'eParamID_VideoInput_4':
 						this.state[item['param_id'].replace('eParamID_', '')] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_AudioInput_1':
 					case 'eParamID_AudioInput_2':
@@ -603,7 +613,7 @@ module.exports = {
 					case 'eParamID_AudioInput_4':
 						this.state[item['param_id'].replace('eParamID_', '')] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_StoragePath':
 						this.state['StoragePath'] = item['str_value']
@@ -612,7 +622,7 @@ module.exports = {
 					case 'eParamID_AnalogAudioStandard':
 						this.state['AnalogAudioStandard'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_RecordFormat':
 						this.state['RecordFormat'] = item['str_value']
@@ -637,7 +647,7 @@ module.exports = {
 					case 'eParamID_UIMonitorChannel':
 						this.state['UIMonitorChannel'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_Ch1Enable':
 					case 'eParamID_Ch2Enable':
@@ -645,7 +655,7 @@ module.exports = {
 					case 'eParamID_Ch4Enable':
 						this.state[item['param_id'].replace('eParamID_', '')] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_Channel_1_InputFormat':
 					case 'eParamID_Channel_2_InputFormat':
@@ -663,7 +673,7 @@ module.exports = {
 						const _rdCh = item['param_id'].match(/Channel_(\d)_Main/)[1]
 						this.state[`Ch${_rdCh}RecordDest`] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					}
 					case 'eParamID_Channel_1_Backup_Record_Destination':
@@ -673,13 +683,13 @@ module.exports = {
 						const _bdCh = item['param_id'].match(/Channel_(\d)_Backup/)[1]
 						this.state[`Ch${_bdCh}BackupDest`] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					}
 					case 'eParamID_PlaybackMediaSource':
 						this.state['PlaybackSource'] = String(item['int_value'])
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_VideoEncoder':
 						this.state['VideoEncoder'] = item['str_value'] || ''
@@ -706,7 +716,7 @@ module.exports = {
 					case 'eParamID_MediaState':
 						this.state['MediaState'] = item['value']
 						this.checkVariables()
-						this.checkFeedbacks()
+						this.checkAllFeedbacks()
 						break
 					case 'eParamID_RecordFormat':
 						this.state['RecordFormat'] = item['value_name'] || item['value']
@@ -744,158 +754,41 @@ module.exports = {
 	},
 
 	doGetParam(paramid, callback) {
-		let args = { headers: {} }
-		if (this.authenticated) {
-			args.headers['Cookie'] = this.authToken
-		}
-		let client = new Client()
-		client
-			.get(
-				'http://' + this.config.host + '/config?action=get&paramid=' + paramid + '&configid=0',
-				args,
-				function (data, response) {
-					try {
-						if (response.statusCode === 200 && data && data.length > 0) {
-							callback(JSON.parse(data.toString()))
-						}
-					} catch (e) {}
-				}
-			)
-			.on('error', function () {})
+		this.httpRequest('/config?action=get&paramid=' + paramid + '&configid=0').then(
+			({ data, response }) => {
+				try {
+					if (response.statusCode === 200 && data.length > 0) {
+						callback(JSON.parse(data.toString()))
+					}
+				} catch (e) {}
+			},
+			() => {},
+		)
 	},
 
 	doCommand(cmd) {
-		let args = {
-			headers: {},
-		}
-
-		if (this.config.password !== '') {
-			args.headers['Cookie'] = this.authToken
-		}
-
-		let client = new Client()
-
-		client
-			.get(
-				'http://' + this.config.host + '/config?action=set&paramid=eParamID_' + cmd,
-				args,
-				function (data, response) {
-					this.handleReply(null, { data: data, response: response })
-				}.bind(this)
-			)
-			.on(
-				'error',
-				function (error) {
-					this.handleReply(true, { error: error })
-				}.bind(this)
-			)
+		this.request('/config?action=set&paramid=eParamID_' + cmd)
 	},
 
 	doConnect() {
 		if (!this.waiting) {
 			this.waiting = true
-
-			let args = {
-				headers: {},
-			}
-
-			if (this.authenticated) {
-				args.headers['Cookie'] = this.authToken
-			}
-
-			let client = new Client()
-
-			client
-				.get(
-					'http://' + this.config.host + '/json?action=connect&configid=0',
-					args,
-					function (data, response) {
-						this.handleReply(null, { data: data, response: response })
-					}.bind(this)
-				)
-				.on(
-					'error',
-					function (error) {
-						this.handleReply(true, { error: error })
-					}.bind(this)
-				)
+			this.request('/json?action=connect&configid=0')
 		}
 	},
 
 	doGetClips() {
-		let args = {
-			headers: {},
-		}
-
-		if (this.authenticated) {
-			args.headers['Cookie'] = this.authToken
-		}
-
-		let client = new Client()
-
-		client
-			.get(
-				'http://' + this.config.host + '/clips?action=get_clips',
-				args,
-				function (data, response) {
-					this.handleReply(null, { data: data, response: response })
-				}.bind(this)
-			)
-			.on(
-				'error',
-				function (error) {
-					this.handleReply(true, { error: error })
-				}.bind(this)
-			)
+		this.request('/clips?action=get_clips')
 	},
 
 	doRequestUpdate() {
 		if (!this.waiting) {
 			this.waiting = true
 
-			let args = {
-				headers: {},
-			}
-
-			if (this.authenticated) {
-				args.headers['Cookie'] = this.authToken
-			}
-
-			let client = new Client()
-
-			client
-				.get(
-					'http://' +
-						this.config.host +
-						'/json?action=wait_for_config_events&configid=0&connectionid=' +
-						this.connectionID,
-					args,
-					function (data, response) {
-						this.handleReply(null, { data: data, response: response })
-					}.bind(this)
-				)
-				.on(
-					'error',
-					function (error) {
-						this.handleReply(true, { error: error })
-					}.bind(this)
-				)
+			this.request('/json?action=wait_for_config_events&configid=0&connectionid=' + this.connectionID)
 
 			//also get mediastate
-			client
-				.get(
-					'http://' + this.config.host + '/json?action=get&paramid=eParamID_MediaState',
-					args,
-					function (data, response) {
-						this.handleReply(null, { data: data, response: response })
-					}.bind(this)
-				)
-				.on(
-					'error',
-					function (error) {
-						this.handleReply(true, { error: error })
-					}.bind(this)
-				)
+			this.request('/json?action=get&paramid=eParamID_MediaState')
 		}
 	},
 }

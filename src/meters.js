@@ -1,5 +1,5 @@
-const http = require('http')
-const zlib = require('zlib')
+import http from 'node:http'
+import zlib from 'node:zlib'
 
 // The Ki Pro GO has no audio level params in its REST API. The web UI instead shows
 // /images/fp-overlay.png, a 320x180 render of the front panel LCD overlay, which
@@ -17,7 +17,7 @@ const METER_PX_PER_DB = 1.5
 const METER_FLOOR_DB = -70
 const METER_LIT_THRESHOLD = 0x70
 
-module.exports = {
+export default {
 	startMeterTimer() {
 		this.stopMeterTimer()
 
@@ -33,6 +33,7 @@ module.exports = {
 			delete this.meterTimer
 		}
 		this.meterWaiting = false
+		this.metersPublished = false
 	},
 
 	doGetMeters() {
@@ -65,7 +66,7 @@ module.exports = {
 						}
 					}
 				})
-			}
+			},
 		)
 		req.on('timeout', () => req.destroy())
 		req.on('error', () => {
@@ -149,16 +150,19 @@ module.exports = {
 		const levelL = this.readMeterLevel(img, METER_COLUMNS.L)
 		const levelR = this.readMeterLevel(img, METER_COLUMNS.R)
 
-		const changed = levelL !== this.state['AudioLevelL'] || levelR !== this.state['AudioLevelR']
+		// Always publish the first reading, so the variables are set even while silent
+		const changed =
+			!this.metersPublished || levelL !== this.state['AudioLevelL'] || levelR !== this.state['AudioLevelR']
 		this.state['AudioLevelL'] = levelL
 		this.state['AudioLevelR'] = levelR
 		if (!changed) return
+		this.metersPublished = true
 
 		const fmt = (db) => (db === null ? '-inf' : db.toFixed(0))
 		this.setVariableValues({
 			AudioLevelL: fmt(levelL),
 			AudioLevelR: fmt(levelR),
 		})
-		this.checkFeedbacks('audio_meter', 'audio_level')
+		this.checkFeedbacks('audio_level_db', 'audio_level')
 	},
 }

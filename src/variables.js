@@ -6,7 +6,7 @@ const MEDIA_SLOT_STATE_LABELS = ['Unknown', 'Mounting', 'Read-Only', 'Ready', 'U
 const RECORD_DEST_LABELS = { 0: 'None', 5: 'USB 1', 6: 'USB 2', 7: 'USB 3', 8: 'USB 4', 9: 'USB 5', 10: 'SMB' }
 const ANALOG_AUDIO_LEVEL_LABELS = ['+24dBu', '+18dBu', '+15dBu', '+12dBu']
 
-module.exports = {
+export default {
 	initVariables() {
 		let variables = [
 			{ name: 'TimeCode Hours', variableId: 'TC_hours' },
@@ -78,7 +78,7 @@ module.exports = {
 			{ name: 'USB 5 Free Space (GB)', variableId: 'MediaSlot5CapacityGB' },
 		]
 
-		this.setVariableDefinitions(variables)
+		this.setVariableDefinitions(Object.fromEntries(variables.map(({ variableId, name }) => [variableId, { name }])))
 	},
 
 	checkVariables() {

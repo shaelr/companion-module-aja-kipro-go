@@ -1,4 +1,4 @@
-const { combineRgb } = require('@companion-module/base')
+import { combineRgb } from '@companion-module/base'
 
 const MONITOR_CHANNEL_CHOICES = [
 	{ id: '0', label: 'Ch 1' },
@@ -75,7 +75,7 @@ const ANALOG_AUDIO_LEVEL_CHOICES = [
 	{ id: '3', label: '+12dBu' },
 ]
 
-module.exports = {
+export default {
 	initFeedbacks() {
 		let self = this
 		const feedbacks = {}
@@ -477,80 +477,26 @@ module.exports = {
 			},
 		}
 
-		// Bar layouts in a 0-100 button coordinate space. 'centered' is two 20-wide bars at
-		// x 27/53, y 6-76, leaving room for the label underneath
-		const METER_LAYOUTS = {
-			centered: { bars: [27, 53], width: 20, y: 6, height: 70 },
-			right: { bars: [76, 88], width: 9, y: 6, height: 88 },
-			left: { bars: [3, 15], width: 9, y: 6, height: 88 },
-		}
-		// Meter scale and zone colours: green to -20, amber to -10, red above
-		const METER_MIN_DB = -60
-		const METER_ZONES = [
-			{ from: -10, colour: [0xdc, 0x00, 0x00] },
-			{ from: -20, colour: [0xe6, 0xc8, 0x00] },
-			{ from: -Infinity, colour: [0x00, 0xc8, 0x00] },
-		]
-		const METER_TRACK_DIM = 0.25
-
-		feedbacks['audio_meter'] = {
-			type: 'advanced',
-			name: 'Audio meter',
+		feedbacks['audio_level_db'] = {
+			type: 'value',
+			name: 'Audio meter level (dB)',
 			description:
-				'Draws the headphone channel audio meters on the button (requires Audio Meters enabled in the module config)',
+				'The headphone channel meter level in dB, for driving gauges and expressions. -70 when silent (requires Audio Meters enabled in the module config)',
 			options: [
 				{
 					type: 'dropdown',
-					label: 'Layout',
-					id: 'position',
-					default: 'centered',
+					label: 'Meter',
+					id: 'meter',
+					default: 'L',
 					choices: [
-						{ id: 'centered', label: 'Centered' },
-						{ id: 'right', label: 'Right edge' },
-						{ id: 'left', label: 'Left edge' },
+						{ id: 'L', label: 'Left' },
+						{ id: 'R', label: 'Right' },
 					],
 				},
 			],
 			callback: function (feedback) {
-				const w = feedback.image?.width ?? 72
-				const h = feedback.image?.height ?? 72
-				const layout = METER_LAYOUTS[feedback.options.position] ?? METER_LAYOUTS.centered
-				const sx = (v) => Math.round((v * w) / 100)
-				const sy = (v) => Math.round((v * h) / 100)
-
-				const buf = Buffer.alloc(w * h * 4)
-				const top = sy(layout.y)
-				const bottom = sy(layout.y + layout.height)
-				const barH = bottom - top
-
-				// Round the width once so both bars are always the same number of pixels wide
-				const barW = Math.max(1, sx(layout.width))
-
-				const levels = [self.state['AudioLevelL'], self.state['AudioLevelR']]
-				levels.forEach((level, n) => {
-					const x0 = sx(layout.bars[n])
-					const x1 = Math.min(w, x0 + barW)
-					for (let y = top; y < bottom; y++) {
-						// dB at this row: 0 at the top, METER_MIN_DB at the bottom
-						const db = METER_MIN_DB * ((y - top + 0.5) / barH)
-						const lit = level !== null && level !== undefined && db <= level
-						const zone = METER_ZONES.find((z) => db >= z.from)
-						const scale = lit ? 1 : METER_TRACK_DIM
-						for (let x = x0; x < x1; x++) {
-							const i = (y * w + x) * 4
-							buf[i] = Math.round(zone.colour[0] * scale)
-							buf[i + 1] = Math.round(zone.colour[1] * scale)
-							buf[i + 2] = Math.round(zone.colour[2] * scale)
-							buf[i + 3] = 255
-						}
-					}
-				})
-
-				return {
-					imageBuffer: buf,
-					imageBufferEncoding: { pixelFormat: 'RGBA' },
-					imageBufferPosition: { x: 0, y: 0, width: w, height: h },
-				}
+				const level = self.state[feedback.options.meter === 'R' ? 'AudioLevelR' : 'AudioLevelL']
+				return level === null || level === undefined ? -70 : level
 			},
 		}
 

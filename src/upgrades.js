@@ -1,7 +1,27 @@
 // Old record destination / playback source option ids (0-5) -> device enum values (5-10)
 const OLD_DEST_TO_NEW = { 0: '5', 1: '6', 2: '7', 3: '8', 4: '9', 5: '10' }
 
-module.exports = [
+// Module API 2.x passes option values to upgrade scripts as { value, isExpression }.
+// Returns the plain value of an option, or undefined if it is missing or an expression.
+function getOptionValue(options, key) {
+	const option = options[key]
+	if (option === undefined || option === null) return undefined
+	if (typeof option === 'object' && 'isExpression' in option) {
+		return option.isExpression ? undefined : option.value
+	}
+	return option
+}
+
+function setOptionValue(options, key, value) {
+	const option = options[key]
+	if (option !== null && typeof option === 'object' && 'isExpression' in option) {
+		option.value = value
+	} else {
+		options[key] = value
+	}
+}
+
+export default [
 	function (context, props) {
 		// This is a placeholder than now cannot be used/removed
 		return {
@@ -18,14 +38,15 @@ module.exports = [
 
 		for (const action of props.actions) {
 			if (['setRecordDest', 'setBackupDest', 'setPlaybackSource'].includes(action.actionId)) {
-				const newValue = OLD_DEST_TO_NEW[action.options.value]
+				const newValue = OLD_DEST_TO_NEW[getOptionValue(action.options, 'value')]
 				if (newValue !== undefined) {
-					action.options.value = newValue
+					setOptionValue(action.options, 'value', newValue)
 					updatedActions.push(action)
 				}
 			} else if (action.actionId === 'loop') {
-				if (action.options.idx === '0' || action.options.idx === '1') {
-					action.options.idx = action.options.idx === '0' ? '1' : '0'
+				const idx = getOptionValue(action.options, 'idx')
+				if (idx === '0' || idx === '1') {
+					setOptionValue(action.options, 'idx', idx === '0' ? '1' : '0')
 					updatedActions.push(action)
 				}
 			}
@@ -33,9 +54,9 @@ module.exports = [
 
 		for (const feedback of props.feedbacks) {
 			if (feedback.feedbackId === 'record_dest') {
-				const newValue = OLD_DEST_TO_NEW[feedback.options.value]
+				const newValue = OLD_DEST_TO_NEW[getOptionValue(feedback.options, 'value')]
 				if (newValue !== undefined) {
-					feedback.options.value = newValue
+					setOptionValue(feedback.options, 'value', newValue)
 					updatedFeedbacks.push(feedback)
 				}
 			}

@@ -4,11 +4,11 @@ Companion module for the AJA Ki Pro Go / Ki Pro Go2 recorder.
 
 ## Architecture
 
-Built on `@companion-module/base`. All source is in `src/`. The entry point is `index.js`, which constructs `AjaKiProInstance` by mixing in the modules below via `Object.assign`.
+Built on `@companion-module/base` 2.1.x (module API 2, Companion 5.0+), as an ES module (`"type": "module"`). All source is in `src/`. The entry point is `index.js`, which default-exports `AjaKiProInstance` (built by mixing in the modules below via `Object.assign`) and exports `UpgradeScripts`.
 
 | File | Purpose |
 |---|---|
-| `src/api.js` | HTTP polling, connection/auth, param fetching, state updates |
+| `src/api.js` | HTTP polling, connection/auth, param fetching, state updates (uses Node's built-in `fetch`) |
 | `src/actions.js` | Companion action definitions |
 | `src/feedbacks.js` | Companion feedback definitions |
 | `src/variables.js` | Variable definitions and `checkVariables()` |
@@ -46,7 +46,7 @@ npm install
 node_modules/.bin/companion-module-build
 ```
 
-Output: `aja-kipro-go-<version>.tgz` — import directly into Companion 3+ via Developer > Install from file.
+Output: `aja-kipro-go-<version>.tgz` — import directly into Companion 5+ via Developer > Install from file. `npx companion-module-check` validates the module.
 
 ## Key design notes
 
@@ -57,3 +57,6 @@ Output: `aja-kipro-go-<version>.tgz` — import directly into Companion 3+ via D
 - Media slot remaining capacity comes in as KB; `checkVariables()` converts to GB with one decimal place.
 - `doGetParam` callbacks receive a single parsed JSON object with fields `value`, `value_name`, `str_value` depending on param type.
 - There are no audio level params in the API. `src/meters.js` polls `/images/fp-overlay.png` (320x180 front panel overlay the web UI draws its meters from), decodes the PNG and reads the headphone channel VU bars from pixel columns x=280/301 (0 dB at y=28, 1.5 px/dB). Pixels above `0x70` count as lit; unlit segments max out at `0x50`.
+- Module API 2.x rules: call `checkAllFeedbacks()` (not `checkFeedbacks()` with no args); `setVariableDefinitions` takes an object; text options with `useVariables` arrive already parsed (there is no `parseVariablesInString`); upgrade scripts receive option values as `{ value, isExpression }`.
+- Presets are built as a flat list in `initPresets()` and converted to sections + `simple` definitions at the end. The Audio Meter preset is a `layered` definition with gauge elements driven by local variables bound to the `audio_level_db` value feedback. Avoid `advanced` feedbacks/image buffers — Companion 5 marks them deprecated.
+- The build bundles everything into one file with esbuild. `node-rest-client` broke under bundling (`ReferenceError: result is not defined`, crashing the module in a restart loop), so HTTP uses `fetch` via `httpRequest()` / `request()` in `api.js`. Test changes against the built `.tgz` (`pkg/main.js`), not just the source, before releasing.

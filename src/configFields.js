@@ -1,4 +1,4 @@
-module.exports = {
+export default {
 	getConfigFields() {
 		return [
 			{
@@ -38,7 +38,6 @@ module.exports = {
 				min: 10,
 				max: 5000,
 				default: 100,
-				required: true,
 			},
 			{
 				type: 'static-text',

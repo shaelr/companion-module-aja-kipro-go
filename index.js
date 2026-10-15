@@ -1,16 +1,18 @@
-const { InstanceBase, InstanceStatus, runEntrypoint } = require('@companion-module/base')
+import { InstanceBase, InstanceStatus } from '@companion-module/base'
 
-const UpgradeScripts = require('./src/upgrades')
+import UpgradeScripts from './src/upgrades.js'
 
-const configFields = require('./src/configFields')
-const api = require('./src/api')
-const actions = require('./src/actions')
-const variables = require('./src/variables')
-const feedbacks = require('./src/feedbacks')
-const presets = require('./src/presets')
-const meters = require('./src/meters')
+import configFields from './src/configFields.js'
+import api from './src/api.js'
+import actions from './src/actions.js'
+import variables from './src/variables.js'
+import feedbacks from './src/feedbacks.js'
+import presets from './src/presets.js'
+import meters from './src/meters.js'
 
-class AjaKiProInstance extends InstanceBase {
+export { UpgradeScripts }
+
+export default class AjaKiProInstance extends InstanceBase {
 	constructor(internal) {
 		super(internal)
 
@@ -133,7 +135,7 @@ class AjaKiProInstance extends InstanceBase {
 		this.initPresets()
 
 		this.checkVariables()
-		this.checkFeedbacks()
+		this.checkAllFeedbacks()
 
 		this.stopRequestTimer()
 		this.stopConnectTimer()
@@ -149,8 +151,6 @@ class AjaKiProInstance extends InstanceBase {
 		this.stopConnectTimer()
 		this.stopMeterTimer()
 
-		this.debug('destroy', this.id)
+		this.log('debug', 'destroy')
 	}
 }
-
-runEntrypoint(AjaKiProInstance, UpgradeScripts)

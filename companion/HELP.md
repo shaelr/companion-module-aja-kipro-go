@@ -1,5 +1,7 @@
 ## AJA Ki Pro / Ki Pro Ultra
 
+Version 2.0 and later of this module require Companion 5.0 or newer.
+
 This module will allow you to control the AJA Ki Pro and Ki Pro Ultra series recorders.
 
 ### Configuration
@@ -16,7 +18,7 @@ Some older KiPro units will output incorrect headers that will result in polling
 The Ki Pro GO does not report audio levels through its API. With **Audio Meters** enabled in the config, the module reads the headphone channel VU meters from the front panel overlay image the web UI shows. This provides:
 
 - Variables `AudioLevelL` / `AudioLevelR` (dB, `-inf` when silent)
-- **Audio meter** feedback, which draws stereo level meters on the button (see the Audio presets)
+- **Audio meter level (dB)** value feedback, for driving gauge elements on layered buttons. The **Audio Meter** preset is a ready-made stereo meter that also turns red when the audio peaks
 - **Audio level above threshold** feedback for peak / signal-present indication
 
 Use **Set Headphone Monitor Channel** to choose which channel is metered.

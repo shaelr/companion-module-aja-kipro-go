@@ -58,7 +58,7 @@ const ANALOG_AUDIO_LEVEL_CHOICES = [
 // eParamID_StorageCommand erase values, keyed by formatUSB drive option
 const FORMAT_STORAGE_COMMAND = { 1: '5', 2: '6', 3: '7', 4: '8', 5: '9', All: '10' }
 
-module.exports = {
+export default {
 	initActions() {
 		let self = this
 		let actions = {}
@@ -246,7 +246,8 @@ module.exports = {
 				},
 			],
 			callback: async function (event) {
-				let clipName = await self.parseVariablesInString(event.options.clipname)
+				// Variables in the clip name are resolved by Companion before the callback runs
+				let clipName = event.options.clipname
 				let setCmd = 'UseCustomClipName&value=1'
 				self.doCommand(setCmd)
 
@@ -276,7 +277,8 @@ module.exports = {
 			],
 			callback: async function (event) {
 				let channelNumber = event.options.channel
-				let clipName = await self.parseVariablesInString(event.options.clipname)
+				// Variables in the clip name are resolved by Companion before the callback runs
+				let clipName = event.options.clipname
 
 				cmd = 'Channel_' + channelNumber + '_Clipname&value=' + clipName
 				self.doCommand(cmd)

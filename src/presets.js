@@ -1,6 +1,6 @@
-const { combineRgb } = require('@companion-module/base')
+import { combineRgb, ButtonGraphicsDecorationType, ButtonGraphicsShowStatusIcons } from '@companion-module/base'
 
-module.exports = {
+export default {
 	initPresets() {
 		let self = this
 
@@ -384,21 +384,6 @@ module.exports = {
 			{
 				type: 'button',
 				category: 'Audio',
-				label: 'Audio Meter',
-				style: {
-					text: `$(${this.label}:HeadphoneMonitorChannel)`,
-					size: '14',
-					alignment: 'center:bottom',
-					show_topbar: false,
-					color: combineRgb(255, 255, 255),
-					bgcolor: combineRgb(0, 0, 0),
-				},
-				steps: [],
-				feedbacks: [{ feedbackId: 'audio_meter', options: { position: 'centered' } }],
-			},
-			{
-				type: 'button',
-				category: 'Audio',
 				label: 'Audio Peak Warning',
 				style: {
 					text: 'AUDIO\\nPEAK',
@@ -457,7 +442,6 @@ module.exports = {
 					size: 'auto',
 					color: combineRgb(255, 255, 255),
 					bgcolor: combineRgb(0, 0, 0),
-					relative_delay: true,
 				},
 				steps: [
 					{
@@ -481,7 +465,6 @@ module.exports = {
 					size: 'auto',
 					color: combineRgb(255, 255, 255),
 					bgcolor: combineRgb(0, 0, 0),
-					relative_delay: true,
 				},
 				steps: [
 					{
@@ -649,6 +632,110 @@ module.exports = {
 			})),
 		]
 
-		this.setPresetDefinitions(presets)
+		// Convert the flat preset list into the module API 2.x structure: one section per category,
+		// with each preset stored as a 'simple' definition
+		const sections = []
+		const definitions = {}
+		presets.forEach((preset, index) => {
+			let section = sections.find((s) => s.name === preset.category)
+			if (!section) {
+				section = { id: preset.category.toLowerCase().replace(/[^a-z0-9]+/g, '_'), name: preset.category, definitions: [] }
+				sections.push(section)
+			}
+
+			const id = `${section.id}_${index}`
+			section.definitions.push(id)
+			definitions[id] = {
+				type: 'simple',
+				name: preset.label,
+				style: preset.style,
+				steps: preset.steps.map((step) => ({
+					...step,
+					down: step.down.map((action) => ({ options: {}, ...action })),
+					up: step.up.map((action) => ({ options: {}, ...action })),
+				})),
+				feedbacks: preset.feedbacks,
+			}
+		})
+
+		// Stereo audio meter drawn with gauge elements (layered preset). Each bar is driven by a
+		// feedback-typed local variable bound to the 'audio_level_db' value feedback.
+		const meterBar = (id, x, levelVariable) => ({
+			type: 'gauge',
+			id,
+			x,
+			y: 6,
+			width: 20,
+			height: 70,
+			orientation: 'vertical',
+			min: -60,
+			max: 0,
+			value: { isExpression: true, value: `$(local:${levelVariable})` },
+			multiColour: true,
+			trackStyle: 'dimmed',
+			roundedEnds: false,
+			stops: [
+				{ value: -60, color: 0x00c800, gradient: false },
+				{ value: -20, color: 0xe6c800, gradient: false },
+				{ value: -10, color: 0xdc0000, gradient: false },
+			],
+		})
+
+		definitions['audio_meter'] = {
+			type: 'layered',
+			name: 'Audio Meter',
+			keywords: ['audio', 'meter', 'level', 'vu'],
+			canvas: {
+				decoration: ButtonGraphicsDecorationType.None,
+				showStatusIcons: ButtonGraphicsShowStatusIcons.None,
+			},
+			elements: [
+				// Full-button background, turned red by the peak feedback below
+				{ type: 'box', id: 'background', x: 0, y: 0, width: 100, height: 100, color: 0x000000 },
+				meterBar('meterLeft', 27, 'levelLeft'),
+				meterBar('meterRight', 53, 'levelRight'),
+				{
+					type: 'text',
+					id: 'label',
+					x: 0,
+					y: 78,
+					width: 100,
+					height: 20,
+					text: `$(${this.label}:HeadphoneMonitorChannel)`,
+					halign: 'center',
+					valign: 'center',
+					fontsizeAllowShrink: true,
+					color: 0xffffff,
+					outlineColor: 0x000000,
+				},
+			],
+			feedbacks: [
+				{
+					feedbackId: 'audio_level',
+					options: { meter: 'either', threshold: -2 },
+					styleOverrides: [{ elementId: 'background', elementProperty: 'color', override: 0xdc0000 }],
+				},
+			],
+			steps: [{ down: [], up: [] }],
+			localVariables: [
+				{
+					variableType: 'feedback',
+					variableName: 'levelLeft',
+					feedbackId: 'audio_level_db',
+					options: { meter: 'L' },
+				},
+				{
+					variableType: 'feedback',
+					variableName: 'levelRight',
+					feedbackId: 'audio_level_db',
+					options: { meter: 'R' },
+				},
+			],
+		}
+
+		const audioSection = sections.find((s) => s.id === 'audio')
+		if (audioSection) audioSection.definitions.unshift('audio_meter')
+
+		this.setPresetDefinitions(sections, definitions)
 	},
 }
