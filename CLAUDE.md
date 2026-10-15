@@ -15,6 +15,7 @@ Built on `@companion-module/base`. All source is in `src/`. The entry point is `
 | `src/presets.js` | Preset button definitions |
 | `src/configFields.js` | Module config fields (host, password, polling, etc.) |
 | `src/upgrades.js` | Companion upgrade scripts |
+| `src/meters.js` | Audio meters read from the front panel overlay image (opt-in) |
 
 ## Device API
 
@@ -45,11 +46,14 @@ npm install
 node_modules/.bin/companion-module-build
 ```
 
-Output: `aja-kipro-go-1.0.0.tgz` — import directly into Companion 3+ via Developer > Install from file.
+Output: `aja-kipro-go-<version>.tgz` — import directly into Companion 3+ via Developer > Install from file.
 
 ## Key design notes
 
 - `doCommand(cmd)` prepends `eParamID_` — never include it in action callbacks.
+- Record destination, backup destination and playback source use the device enum values `5`–`10` (USB 1–5, SMB); backup also allows `0` = None. Check `http://<host>/descriptors` for real enum values before adding params.
+- Formatting is done like the web UI: set `StorageCommand` to `5`–`9` (USB 1–5) or `10` (All), then reset `FormatMedia_USB_x` to `0`.
 - State values for monitor channels, video/audio inputs, and record destinations are stored as strings (`'0'`, `'1'`, …) and converted to labels in `checkVariables()`.
 - Media slot remaining capacity comes in as KB; `checkVariables()` converts to GB with one decimal place.
 - `doGetParam` callbacks receive a single parsed JSON object with fields `value`, `value_name`, `str_value` depending on param type.
+- There are no audio level params in the API. `src/meters.js` polls `/images/fp-overlay.png` (320x180 front panel overlay the web UI draws its meters from), decodes the PNG and reads the headphone channel VU bars from pixel columns x=280/301 (0 dB at y=28, 1.5 px/dB). Pixels above `0x70` count as lit; unlit segments max out at `0x50`.

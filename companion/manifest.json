@@ -3,7 +3,7 @@
 	"name": "AJA Ki Pro Go",
 	"shortname": "kipro-go",
 	"description": "Module to control the AJA Ki Pro Go",
-	"version": "1.0.1",
+	"version": "1.0.2",
 	"license": "MIT",
 	"repository": "git+https://github.com/shaelr/companion-module-aja-kipro-go.git",
 	"bugs": "https://github.com/shaelr/companion-module-aja-kipro-go/issues",

@@ -11,6 +11,16 @@ This module will allow you to control the AJA Ki Pro and Ki Pro Ultra series rec
 
 Some older KiPro units will output incorrect headers that will result in polling being disabled
 
+### Audio meters (Ki Pro GO)
+
+The Ki Pro GO does not report audio levels through its API. With **Audio Meters** enabled in the config, the module reads the headphone channel VU meters from the front panel overlay image the web UI shows. This provides:
+
+- Variables `AudioLevelL` / `AudioLevelR` (dB, `-inf` when silent)
+- **Audio meter** feedback, which draws ATEM-style meters on the button (see the Audio presets)
+- **Audio level above threshold** feedback for peak / signal-present indication
+
+Use **Set Headphone Monitor Channel** to choose which channel is metered.
+
 ### To use the module
 
 Add an action to a button and choose the action you wish to use.

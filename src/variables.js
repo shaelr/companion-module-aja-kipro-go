@@ -2,8 +2,9 @@ const MONITOR_CHANNEL_LABELS = ['Ch 1', 'Ch 2', 'Ch 3', 'Ch 4', 'All Channels']
 const VIDEO_INPUT_LABELS = ['SDI 1', 'SDI 2', 'SDI 3', 'SDI 4', 'HDMI 1', 'HDMI 2', 'HDMI 3', 'HDMI 4']
 const AUDIO_INPUT_LABELS = ['Follows Video', 'Analog']
 const MEDIA_SLOT_STATE_LABELS = ['Unknown', 'Mounting', 'Read-Only', 'Ready', 'Unmounting', 'Unmounted', '', '', '', 'Error']
-const RECORD_DEST_LABELS = ['USB 1', 'USB 2', 'USB 3', 'USB 4', 'USB 5', 'SMB']
-const PLAYBACK_SOURCE_LABELS = ['USB 1', 'USB 2', 'USB 3', 'USB 4', 'USB 5', 'SMB']
+// Device enum values for record destination / playback source (5-10, 0 = None for backup)
+const RECORD_DEST_LABELS = { 0: 'None', 5: 'USB 1', 6: 'USB 2', 7: 'USB 3', 8: 'USB 4', 9: 'USB 5', 10: 'SMB' }
+const ANALOG_AUDIO_LEVEL_LABELS = ['+24dBu', '+18dBu', '+15dBu', '+12dBu']
 
 module.exports = {
 	initVariables() {
@@ -41,6 +42,9 @@ module.exports = {
 			{ name: 'Video Encoder', variableId: 'VideoEncoder' },
 			{ name: 'File Type', variableId: 'FileType' },
 			{ name: 'Playback Source', variableId: 'PlaybackSource' },
+			{ name: 'Analog Audio Input Level', variableId: 'AnalogAudioStandard' },
+			{ name: 'Audio Meter Left (dB)', variableId: 'AudioLevelL' },
+			{ name: 'Audio Meter Right (dB)', variableId: 'AudioLevelR' },
 			{ name: 'Ch 1 Enable', variableId: 'Ch1Enable' },
 			{ name: 'Ch 2 Enable', variableId: 'Ch2Enable' },
 			{ name: 'Ch 3 Enable', variableId: 'Ch3Enable' },
@@ -122,10 +126,10 @@ module.exports = {
 				variableObj[`Ch${ch}InputFormat`] = this.state[`Ch${ch}InputFormat`] ?? ''
 
 				const rdVal = this.state[`Ch${ch}RecordDest`]
-				variableObj[`Ch${ch}RecordDest`] = rdVal !== '' ? (RECORD_DEST_LABELS[Number(rdVal)] ?? '') : ''
+				variableObj[`Ch${ch}RecordDest`] = rdVal ? (RECORD_DEST_LABELS[rdVal] ?? '') : ''
 
 				const bdVal = this.state[`Ch${ch}BackupDest`]
-				variableObj[`Ch${ch}BackupDest`] = bdVal !== '' ? (RECORD_DEST_LABELS[Number(bdVal)] ?? '') : ''
+				variableObj[`Ch${ch}BackupDest`] = bdVal ? (RECORD_DEST_LABELS[bdVal] ?? '') : ''
 			}
 
 			variableObj['StoragePath'] = this.state['StoragePath'] ?? ''
@@ -141,7 +145,10 @@ module.exports = {
 			variableObj['FileType'] = this.state['FileType'] ?? ''
 
 			const pbVal = this.state['PlaybackSource']
-			variableObj['PlaybackSource'] = pbVal !== '' ? (PLAYBACK_SOURCE_LABELS[Number(pbVal)] ?? '') : ''
+			variableObj['PlaybackSource'] = pbVal ? (RECORD_DEST_LABELS[pbVal] ?? '') : ''
+
+			const aaVal = this.state['AnalogAudioStandard']
+			variableObj['AnalogAudioStandard'] = aaVal ? (ANALOG_AUDIO_LEVEL_LABELS[Number(aaVal)] ?? '') : ''
 
 			for (let slot = 1; slot <= 5; slot++) {
 				const stateVal = this.state[`MediaSlot${slot}State`]

@@ -379,14 +379,81 @@ module.exports = {
 			})),
 
 			// ──────────────────────────────────────────
+			// Audio (Ki Pro GO)
+			// ──────────────────────────────────────────
+			{
+				type: 'button',
+				category: 'Audio',
+				label: 'Audio Meter',
+				style: {
+					text: `$(${this.label}:HeadphoneMonitorChannel)`,
+					size: '14',
+					alignment: 'center:bottom',
+					show_topbar: false,
+					color: combineRgb(255, 255, 255),
+					bgcolor: combineRgb(0, 0, 0),
+				},
+				steps: [],
+				feedbacks: [{ feedbackId: 'audio_meter', options: { position: 'centered' } }],
+			},
+			{
+				type: 'button',
+				category: 'Audio',
+				label: 'Audio Peak Warning',
+				style: {
+					text: 'AUDIO\\nPEAK',
+					size: 'auto',
+					color: combineRgb(255, 255, 255),
+					bgcolor: combineRgb(0, 0, 0),
+				},
+				steps: [],
+				feedbacks: [
+					{
+						feedbackId: 'audio_level',
+						options: { meter: 'either', threshold: -2 },
+						style: { color: combineRgb(255, 255, 255), bgcolor: combineRgb(255, 0, 0) },
+					},
+				],
+			},
+			...[
+				{ id: '0', label: '+24dBu' },
+				{ id: '1', label: '+18dBu' },
+				{ id: '2', label: '+15dBu' },
+				{ id: '3', label: '+12dBu' },
+			].map(({ id, label }) => ({
+				type: 'button',
+				category: 'Audio',
+				label: `Analog Level ${label}`,
+				style: {
+					text: `Analog\\n${label}`,
+					size: 'auto',
+					color: combineRgb(255, 255, 255),
+					bgcolor: combineRgb(0, 0, 0),
+				},
+				steps: [
+					{
+						down: [{ actionId: 'setAnalogAudioLevel', options: { value: id } }],
+						up: [],
+					},
+				],
+				feedbacks: [
+					{
+						feedbackId: 'analog_audio_level',
+						options: { value: id },
+						style: { color: combineRgb(255, 255, 255), bgcolor: combineRgb(0, 102, 255) },
+					},
+				],
+			})),
+
+			// ──────────────────────────────────────────
 			// Functions
 			// ──────────────────────────────────────────
 			{
 				type: 'button',
 				category: 'Functions',
-				label: 'Stop and format',
+				label: 'Stop and format USB 1',
 				style: {
-					text: 'Stop & Format',
+					text: 'Stop & Format USB 1',
 					size: 'auto',
 					color: combineRgb(255, 255, 255),
 					bgcolor: combineRgb(0, 0, 0),
@@ -398,7 +465,7 @@ module.exports = {
 							{ actionId: 'stop' },
 							{ actionId: 'stop', delay: 500 },
 							{ actionId: 'customTake', options: { idx: '0' }, delay: 200 },
-							{ actionId: 'format', delay: 200 },
+							{ actionId: 'formatUSB', options: { value: '1' }, delay: 200 },
 						],
 						up: [],
 					},

@@ -36,14 +36,27 @@ const CHANNEL_NUMBER_CHOICES = [
 	{ id: '4', label: 'Ch 4' },
 ]
 
+// Device enum values for record destination / playback source (5-10)
 const RECORD_DEST_CHOICES = [
-	{ id: '0', label: 'USB 1' },
-	{ id: '1', label: 'USB 2' },
-	{ id: '2', label: 'USB 3' },
-	{ id: '3', label: 'USB 4' },
-	{ id: '4', label: 'USB 5' },
-	{ id: '5', label: 'SMB' },
+	{ id: '5', label: 'USB 1' },
+	{ id: '6', label: 'USB 2' },
+	{ id: '7', label: 'USB 3' },
+	{ id: '8', label: 'USB 4' },
+	{ id: '9', label: 'USB 5' },
+	{ id: '10', label: 'SMB' },
 ]
+
+const BACKUP_DEST_CHOICES = [{ id: '0', label: 'None' }, ...RECORD_DEST_CHOICES]
+
+const ANALOG_AUDIO_LEVEL_CHOICES = [
+	{ id: '0', label: '+24dBu' },
+	{ id: '1', label: '+18dBu' },
+	{ id: '2', label: '+15dBu' },
+	{ id: '3', label: '+12dBu' },
+]
+
+// eParamID_StorageCommand erase values, keyed by formatUSB drive option
+const FORMAT_STORAGE_COMMAND = { 1: '5', 2: '6', 3: '7', 4: '8', 5: '9', All: '10' }
 
 module.exports = {
 	initActions() {
@@ -161,8 +174,12 @@ module.exports = {
 				},
 			],
 			callback: async function (event) {
-				cmd = `FormatMedia_USB_${event.options.value}&value=1`
-				self.doCommand(cmd)
+				// Same sequence as the device web UI: trigger the erase via StorageCommand,
+				// then put the FormatMedia_USB_x selector back to "KEEP MEDIA"
+				const storageCmd = FORMAT_STORAGE_COMMAND[event.options.value]
+				if (!storageCmd) return
+				self.doCommand(`StorageCommand&value=${storageCmd}&configid=0`)
+				self.doCommand(`FormatMedia_USB_${event.options.value}&value=0&configid=0`)
 			},
 		}
 
@@ -307,8 +324,8 @@ module.exports = {
 					label: 'On / Off',
 					id: 'idx',
 					choices: [
-						{ id: '0', label: 'Loop Off' },
-						{ id: '1', label: 'Loop On' },
+						{ id: '0', label: 'Loop On' },
+						{ id: '1', label: 'Loop Off' },
 					],
 				},
 			],
@@ -536,7 +553,7 @@ module.exports = {
 					type: 'dropdown',
 					label: 'Destination',
 					id: 'value',
-					default: '0',
+					default: '5',
 					choices: RECORD_DEST_CHOICES,
 				},
 			],
@@ -560,8 +577,8 @@ module.exports = {
 					type: 'dropdown',
 					label: 'Backup Destination',
 					id: 'value',
-					default: '1',
-					choices: RECORD_DEST_CHOICES,
+					default: '0',
+					choices: BACKUP_DEST_CHOICES,
 				},
 			],
 			callback: async function (event) {
@@ -577,12 +594,30 @@ module.exports = {
 					type: 'dropdown',
 					label: 'Source',
 					id: 'value',
-					default: '0',
+					default: '5',
 					choices: RECORD_DEST_CHOICES,
 				},
 			],
 			callback: async function (event) {
 				cmd = `PlaybackMediaSource&value=${event.options.value}`
+				self.doCommand(cmd)
+			},
+		}
+
+		actions.setAnalogAudioLevel = {
+			name: 'Set Analog Audio Input Level (Ki Pro GO)',
+			description: 'Analog input reference level (headroom). This is the only analog gain control the device exposes.',
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Level',
+					id: 'value',
+					default: '0',
+					choices: ANALOG_AUDIO_LEVEL_CHOICES,
+				},
+			],
+			callback: async function (event) {
+				cmd = `AnalogAudioStandard&value=${event.options.value}`
 				self.doCommand(cmd)
 			},
 		}

@@ -55,6 +55,30 @@ module.exports = {
 				width: 12,
 			},
 			{
+				type: 'static-text',
+				id: 'info',
+				width: 12,
+				label: 'Audio Meters',
+				value:
+					'Reads the headphone channel VU meters from the front panel overlay image (as shown in the web UI). Adds network load, so only enable if you use the audio meter variables/feedbacks.',
+			},
+			{
+				type: 'checkbox',
+				label: 'Audio Meters',
+				id: 'audioMeters',
+				width: 2,
+				default: false,
+			},
+			{
+				type: 'number',
+				label: 'Meter Rate (ms)',
+				id: 'audioMeterRate',
+				width: 2,
+				min: 50,
+				max: 2000,
+				default: 200,
+			},
+			{
 				type: 'checkbox',
 				id: 'verbose',
 				label: 'Enable Verbose Logging',

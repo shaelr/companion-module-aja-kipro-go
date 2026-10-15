@@ -8,6 +8,7 @@ const actions = require('./src/actions')
 const variables = require('./src/variables')
 const feedbacks = require('./src/feedbacks')
 const presets = require('./src/presets')
+const meters = require('./src/meters')
 
 class AjaKiProInstance extends InstanceBase {
 	constructor(internal) {
@@ -21,6 +22,7 @@ class AjaKiProInstance extends InstanceBase {
 			...variables,
 			...feedbacks,
 			...presets,
+			...meters,
 		})
 
 		this.waiting = false
@@ -69,6 +71,9 @@ class AjaKiProInstance extends InstanceBase {
 			Ch3BackupDest: '',
 			Ch4BackupDest: '',
 			PlaybackSource: '',
+			AnalogAudioStandard: '',
+			AudioLevelL: null,
+			AudioLevelR: null,
 			VideoEncoder: '',
 			FileType: '',
 			MediaSlot1State: '',
@@ -134,6 +139,7 @@ class AjaKiProInstance extends InstanceBase {
 		this.stopConnectTimer()
 
 		this.startConnectTimer()
+		this.startMeterTimer()
 		this.updateStatus(InstanceStatus.Connecting)
 	}
 
@@ -141,6 +147,7 @@ class AjaKiProInstance extends InstanceBase {
 		//close out any connections
 		this.stopRequestTimer()
 		this.stopConnectTimer()
+		this.stopMeterTimer()
 
 		this.debug('destroy', this.id)
 	}

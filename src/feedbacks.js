@@ -56,13 +56,23 @@ const MEDIA_SLOT_STATE_CHOICES = [
 	{ id: '9', label: 'Error' },
 ]
 
+// Device enum values for record destination / playback source (5-10)
 const RECORD_DEST_CHOICES = [
-	{ id: '0', label: 'USB 1' },
-	{ id: '1', label: 'USB 2' },
-	{ id: '2', label: 'USB 3' },
-	{ id: '3', label: 'USB 4' },
-	{ id: '4', label: 'USB 5' },
-	{ id: '5', label: 'SMB' },
+	{ id: '5', label: 'USB 1' },
+	{ id: '6', label: 'USB 2' },
+	{ id: '7', label: 'USB 3' },
+	{ id: '8', label: 'USB 4' },
+	{ id: '9', label: 'USB 5' },
+	{ id: '10', label: 'SMB' },
+]
+
+const BACKUP_DEST_CHOICES = [{ id: '0', label: 'None' }, ...RECORD_DEST_CHOICES]
+
+const ANALOG_AUDIO_LEVEL_CHOICES = [
+	{ id: '0', label: '+24dBu' },
+	{ id: '1', label: '+18dBu' },
+	{ id: '2', label: '+15dBu' },
+	{ id: '3', label: '+12dBu' },
 ]
 
 module.exports = {
@@ -385,12 +395,199 @@ module.exports = {
 					type: 'dropdown',
 					label: 'Destination',
 					id: 'value',
-					default: '0',
+					default: '5',
 					choices: RECORD_DEST_CHOICES,
 				},
 			],
 			callback: function (feedback) {
 				return self.state[`Ch${feedback.options.channel}RecordDest`] === feedback.options.value
+			},
+		}
+
+		feedbacks['backup_dest'] = {
+			type: 'boolean',
+			name: 'Backup destination active',
+			description: 'Sets the background when the selected backup record destination is active for a channel',
+			defaultStyle: {
+				color: foregroundColorWhite,
+				bgcolor: backgroundColorBlue,
+			},
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Channel',
+					id: 'channel',
+					default: '1',
+					choices: CHANNEL_NUMBER_CHOICES,
+				},
+				{
+					type: 'dropdown',
+					label: 'Backup Destination',
+					id: 'value',
+					default: '0',
+					choices: BACKUP_DEST_CHOICES,
+				},
+			],
+			callback: function (feedback) {
+				return self.state[`Ch${feedback.options.channel}BackupDest`] === feedback.options.value
+			},
+		}
+
+		feedbacks['playback_source'] = {
+			type: 'boolean',
+			name: 'Playback source active',
+			description: 'Sets the background when the selected media is the playback source',
+			defaultStyle: {
+				color: foregroundColorWhite,
+				bgcolor: backgroundColorBlue,
+			},
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Source',
+					id: 'value',
+					default: '5',
+					choices: RECORD_DEST_CHOICES,
+				},
+			],
+			callback: function (feedback) {
+				return self.state['PlaybackSource'] === feedback.options.value
+			},
+		}
+
+		feedbacks['analog_audio_level'] = {
+			type: 'boolean',
+			name: 'Analog audio input level',
+			description: 'Sets the background when the analog audio input level matches',
+			defaultStyle: {
+				color: foregroundColorWhite,
+				bgcolor: backgroundColorBlue,
+			},
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Level',
+					id: 'value',
+					default: '0',
+					choices: ANALOG_AUDIO_LEVEL_CHOICES,
+				},
+			],
+			callback: function (feedback) {
+				return self.state['AnalogAudioStandard'] === feedback.options.value
+			},
+		}
+
+		// Bar layouts in a 0-100 button coordinate space. 'centered' matches the ATEM module's
+		// layered audio meter preset (two 20-wide bars at x 27/53, y 6-76, label underneath)
+		const METER_LAYOUTS = {
+			centered: { bars: [27, 53], width: 20, y: 6, height: 70 },
+			right: { bars: [76, 88], width: 9, y: 6, height: 88 },
+			left: { bars: [3, 15], width: 9, y: 6, height: 88 },
+		}
+		// Same scale and zone colours as the ATEM meters: green to -20, amber to -10, red above
+		const METER_MIN_DB = -60
+		const METER_ZONES = [
+			{ from: -10, colour: [0xdc, 0x00, 0x00] },
+			{ from: -20, colour: [0xe6, 0xc8, 0x00] },
+			{ from: -Infinity, colour: [0x00, 0xc8, 0x00] },
+		]
+		const METER_TRACK_DIM = 0.25
+
+		feedbacks['audio_meter'] = {
+			type: 'advanced',
+			name: 'Audio meter',
+			description:
+				'Draws the headphone channel audio meters on the button (requires Audio Meters enabled in the module config)',
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Layout',
+					id: 'position',
+					default: 'centered',
+					choices: [
+						{ id: 'centered', label: 'Centered (ATEM style)' },
+						{ id: 'right', label: 'Right edge' },
+						{ id: 'left', label: 'Left edge' },
+					],
+				},
+			],
+			callback: function (feedback) {
+				const w = feedback.image?.width ?? 72
+				const h = feedback.image?.height ?? 72
+				const layout = METER_LAYOUTS[feedback.options.position] ?? METER_LAYOUTS.centered
+				const sx = (v) => Math.round((v * w) / 100)
+				const sy = (v) => Math.round((v * h) / 100)
+
+				const buf = Buffer.alloc(w * h * 4)
+				const top = sy(layout.y)
+				const bottom = sy(layout.y + layout.height)
+				const barH = bottom - top
+
+				const levels = [self.state['AudioLevelL'], self.state['AudioLevelR']]
+				levels.forEach((level, n) => {
+					const x0 = sx(layout.bars[n])
+					const x1 = sx(layout.bars[n] + layout.width)
+					for (let y = top; y < bottom; y++) {
+						// dB at this row: 0 at the top, METER_MIN_DB at the bottom
+						const db = METER_MIN_DB * ((y - top + 0.5) / barH)
+						const lit = level !== null && level !== undefined && db <= level
+						const zone = METER_ZONES.find((z) => db >= z.from)
+						const scale = lit ? 1 : METER_TRACK_DIM
+						for (let x = x0; x < x1; x++) {
+							const i = (y * w + x) * 4
+							buf[i] = Math.round(zone.colour[0] * scale)
+							buf[i + 1] = Math.round(zone.colour[1] * scale)
+							buf[i + 2] = Math.round(zone.colour[2] * scale)
+							buf[i + 3] = 255
+						}
+					}
+				})
+
+				return {
+					imageBuffer: buf,
+					imageBufferEncoding: { pixelFormat: 'RGBA' },
+					imageBufferPosition: { x: 0, y: 0, width: w, height: h },
+				}
+			},
+		}
+
+		feedbacks['audio_level'] = {
+			type: 'boolean',
+			name: 'Audio level above threshold',
+			description:
+				'True when the headphone channel audio meter is above the threshold (requires Audio Meters enabled in the module config)',
+			defaultStyle: {
+				color: foregroundColorWhite,
+				bgcolor: backgroundColorRed,
+			},
+			options: [
+				{
+					type: 'dropdown',
+					label: 'Meter',
+					id: 'meter',
+					default: 'either',
+					choices: [
+						{ id: 'L', label: 'Left' },
+						{ id: 'R', label: 'Right' },
+						{ id: 'either', label: 'Either' },
+					],
+				},
+				{
+					type: 'number',
+					label: 'Threshold (dB)',
+					id: 'threshold',
+					default: -2,
+					min: -70,
+					max: 0,
+				},
+			],
+			callback: function (feedback) {
+				const above = (level) => level !== null && level !== undefined && level >= feedback.options.threshold
+				const l = self.state['AudioLevelL']
+				const r = self.state['AudioLevelR']
+				if (feedback.options.meter === 'L') return above(l)
+				if (feedback.options.meter === 'R') return above(r)
+				return above(l) || above(r)
 			},
 		}
 

@@ -353,6 +353,10 @@ module.exports = {
 							this.state['StoragePath'] = item['eParamID_StoragePath']
 						}
 
+						if ('eParamID_AnalogAudioStandard' in item) {
+							this.state['AnalogAudioStandard'] = String(item['eParamID_AnalogAudioStandard'])
+						}
+
 						for (let ch = 1; ch <= 4; ch++) {
 							const vidKey = `eParamID_VideoInput_${ch}`
 							if (vidKey in item) {
@@ -604,6 +608,11 @@ module.exports = {
 					case 'eParamID_StoragePath':
 						this.state['StoragePath'] = item['str_value']
 						this.checkVariables()
+						break
+					case 'eParamID_AnalogAudioStandard':
+						this.state['AnalogAudioStandard'] = String(item['int_value'])
+						this.checkVariables()
+						this.checkFeedbacks()
 						break
 					case 'eParamID_RecordFormat':
 						this.state['RecordFormat'] = item['str_value']
